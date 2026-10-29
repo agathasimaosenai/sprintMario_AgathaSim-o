@@ -7,7 +7,7 @@
 $host   = "localhost";
 $port   = "3306";
 $user   = "root";
-$pass   = "";
+$pass   = "mysql";
 $dbname = "sprintMario";
 
 try {

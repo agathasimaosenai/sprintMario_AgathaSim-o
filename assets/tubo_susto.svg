@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128">
+  <!-- Tampa Superior Metálica (Cinza Escuro / Prata) -->
+  <path fill="#374151" d="M12 2h8v1h-8zm-2 1h12v1H10zm-1 2h14v2H9z" />
+  <path fill="#6b7280" d="M11 3h10v1H11zm0 2h10v1H11z" /> <!-- Brilho do metal -->
+  <path fill="#9ca3af" d="M13 2h2v1h-2zm-1 3h2v1h-2z" />
+
+  <!-- Válvula / Medidor Superior -->
+  <path fill="#ef4444" d="M14 0h4v2h-4z" />
+  <path fill="#dc2626" d="M15 0h2v1h-2z" />
+
+  <!-- Corpo Amarelo Principal do Cilindro -->
+  <path fill="#eab308" d="M8 7h16v20H8z" />
+  <path fill="#fde047" d="M10 7h3v20h-3z" /> <!-- Brilho lateral amarelo claro -->
+  <path fill="#ca8a04" d="M21 7h3v20h-3z" /> <!-- Sombra lateral amarelo escuro -->
+
+  <!-- Faixas Industriais Pretas/Cinzas (Topo e Base do Tanque) -->
+  <path fill="#1f2937" d="M8 7h16v2H8zm0 18h16v2H8z" />
+  <path fill="#4b5563" d="M10 7h4v2h-4zm0 18h4v2h-4z" />
+
+  <!-- Medidor Vertical de Nível de Grito (Scream Meter) -->
+  <path fill="#111827" d="M14 11h4v12h-4z" /> <!-- Fundo do medidor -->
+  
+  <!-- Nível de Energia do Grito (Vermelho no topo, Amarelo/Verde subindo) -->
+  <path fill="#22c55e" d="M15 19h2v3h-2z" /> <!-- Nível baixo (Verde) -->
+  <path fill="#eab308" d="M15 16h2v3h-2z" /> <!-- Nível médio (Amarelo) -->
+  <path fill="#ef4444" d="M15 13h2v3h-2z" /> <!-- Nível alto/cheio (Vermelho) -->
+  <path fill="#ffffff" d="M15 12h2v1h-2z" /> <!-- Brilho / Luz de alerta -->
+
+  <!-- Manômetro / Visor Redondo de Pressão -->
+  <path fill="#374151" d="M13 8h6v3h-6z" />
+  <path fill="#ffffff" d="M14 9h4v1h-4z" />
+  <path fill="#ef4444" d="M16 9h1v1h-1z" /> <!-- Ponteiro vermelho -->
+
+  <!-- Tampa Inferior e Base Metálica -->
+  <path fill="#374151" d="M9 27h14v2H9zm1 2h12v1H10zm2 1h8v1h-8z" />
+  <path fill="#6b7280" d="M11 27h10v1H11zm1 2h8v1h-8z" /> <!-- Brilho da base -->
+  <path fill="#1f2937" d="M11 31h10v1H11z" /> <!-- Pé/Apoio -->
+</svg>

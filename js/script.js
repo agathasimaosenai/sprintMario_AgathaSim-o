@@ -1,46 +1,126 @@
-/*Super Mario Jump - Lógica do Jogo e Integração com Ranking MySQL (Laragon)*/
+/* Monsters Jump - Lógica do Jogo com Ranking MySQL */
 
 document.addEventListener('DOMContentLoaded', () => {
-// Elementos do Jogo
+
+    // ===== PERSONAGENS JOGÁVEIS =====
+    const PERSONAGENS = {
+        sulley:  { nome: 'Sulley',  img: 'assets/sulley.png',  jogador: 120 },
+        boo:     { nome: 'Boo',     img: 'assets/boo.png',     jogador: 110 },
+        mike:    { nome: 'Mike',    img: 'assets/mike.png',    jogador: 130 },
+        randall: { nome: 'Randall', img: 'assets/randall.png', jogador: 90 },
+        roz:     { nome: 'Roz',     img: 'assets/roz.svg',     jogador: 115 },
+        mario:   { nome: 'Mario',   img: 'assets/mario.gif',   jogador: 100 }
+    };
+
+    // Obstáculo fixo do jogo: Tubo de Susto (Largura aumentada para 85px)
+    const OBSTACULO_TUBO = { nome: 'Tubo de Susto', img: 'assets/tubo_susto.svg', largura: 85 };
+
+    const IMG_LOGO = 'assets/logo.png';
+    const PONTOS_POR_MOEDA = 10;
+
+    // Elementos do Jogo
     const mario = document.querySelector('.mario');
     const pipe = document.querySelector('.pipe');
-    const clouds = document.querySelector('.clouds');                  // NOVO
+    const clouds = document.querySelector('.clouds');
+    const doorsBg = document.getElementById('doors-bg');
+    const coin = document.getElementById('coin');
     const gameBoard = document.getElementById('game-board');
+
     const hudPlayerName = document.getElementById('hud-player-name');
     const scoreDisplay = document.getElementById('score-display');
-    const levelDisplay = document.getElementById('level-display');     // NOVO
+    const levelDisplay = document.getElementById('level-display');
+    const coinsDisplay = document.getElementById('coins-display');
     const jumpTip = document.getElementById('jump-tip');
 
-// Modais e Telas
+    // Modais e Telas
+    const characterModal = document.getElementById('character-modal');
+    const charGrid = document.getElementById('char-grid');
+    const btnContinue = document.getElementById('btn-continue');
+
     const startModal = document.getElementById('start-modal');
     const startForm = document.getElementById('start-form');
     const playerInput = document.getElementById('player-input');
+    const chosenImg = document.getElementById('chosen-img');
+    const chosenName = document.getElementById('chosen-name');
+    const btnBack = document.getElementById('btn-back');
     const btnViewRanking = document.getElementById('btn-view-ranking');
 
     const gameoverModal = document.getElementById('gameover-modal');
     const finalScoreValue = document.getElementById('final-score-value');
+    const finalCoinsValue = document.getElementById('final-coins-value');
     const saveStatusMsg = document.getElementById('save-status-msg');
     const rankingBody = document.getElementById('ranking-body');
     const btnRestart = document.getElementById('btn-restart');
     const btnChangePlayer = document.getElementById('btn-change-player');
 
-// Variáveis de Estado
+    // Variáveis de Estado
     let currentPlayer = '';
+    let personagemEscolhido = null; 
     let score = 0;
+    let coinsCollected = 0;
     let isPlaying = false;
     let gameLoop = null;
     let scoreLoop = null;
 
-    // ===== NOVO: TABELA DE NÍVEIS =====
-// Quanto MENOR a duração, MAIS RÁPIDO fica o cano
+    // ===== AJUSTE DE TAMANHO DOS ELEMENTOS =====
+    function applySizes() {
+        const celular = window.matchMedia('(max-width: 600px)').matches;
+        const f = celular ? 0.75 : 1;
+        const jogador = PERSONAGENS[personagemEscolhido] || PERSONAGENS.sulley;
+
+        mario.style.width = Math.round(jogador.jogador * f) + 'px';
+        pipe.style.width = Math.round(OBSTACULO_TUBO.largura * f) + 'px';
+    }
+
+    window.addEventListener('resize', () => { if (isPlaying) applySizes(); });
+
+    // ===== ESCOLHA DO PERSONAGEM =====
+    function escolherPersonagem(chave) {
+        if (!PERSONAGENS[chave]) return;
+        personagemEscolhido = chave;
+        localStorage.setItem('mario_jump_char', chave);
+
+        charGrid.querySelectorAll('.char-card').forEach(card => {
+            card.classList.toggle('selected', card.dataset.char === chave);
+        });
+        btnContinue.disabled = false;
+
+        mario.src = PERSONAGENS[chave].img;
+        chosenImg.src = PERSONAGENS[chave].img;
+        chosenName.textContent = PERSONAGENS[chave].nome;
+        applySizes();
+    }
+
+    charGrid.addEventListener('click', (e) => {
+        const card = e.target.closest('.char-card');
+        if (card) escolherPersonagem(card.dataset.char);
+    });
+
+    btnContinue.addEventListener('click', () => {
+        if (!personagemEscolhido) return;
+        characterModal.classList.remove('active');
+        startModal.classList.add('active');
+        playerInput.focus();
+    });
+
+    btnBack.addEventListener('click', () => {
+        startModal.classList.remove('active');
+        characterModal.classList.add('active');
+    });
+
+    // A moeda reaparece a cada ciclo de animação
+    coin.addEventListener('animationiteration', () => {
+        if (isPlaying) coin.style.visibility = 'visible';
+    });
+
+    // ===== TABELA DE NÍVEIS =====
     const LEVELS = [
-        { nivel: 1, pontos: 0,   duracaoCano: 1.6,  duracaoNuvem: 18 },
-        { nivel: 2, pontos: 150, duracaoCano: 1.25, duracaoNuvem: 14 },
-        { nivel: 3, pontos: 300, duracaoCano: 0.95, duracaoNuvem: 10 }
+        { nivel: 1, pontos: 0,   velocidade: 1.0  },
+        { nivel: 2, pontos: 150, velocidade: 1.28 },
+        { nivel: 3, pontos: 300, velocidade: 1.68 }
     ];
     let currentLevel = LEVELS[0];
 
-    // Descobre em qual nível o jogador está, de acordo com os pontos
     function getLevelByScore(pontos) {
         let resultado = LEVELS[0];
         for (const lvl of LEVELS) {
@@ -49,76 +129,93 @@ document.addEventListener('DOMContentLoaded', () => {
         return resultado;
     }
 
-    // Só aplica a nova velocidade quando a animação reinicia (evita "pulos")
-    pipe.addEventListener('animationiteration', () => {
-        pipe.style.animationDuration = currentLevel.duracaoCano + 's';
-    });
-    clouds.addEventListener('animationiteration', () => {
-        clouds.style.animationDuration = currentLevel.duracaoNuvem + 's';
-    });
-// ===== FIM DO NOVO =====
+    function applySpeed() {
+        [pipe, coin, clouds, doorsBg].forEach(el => {
+            if (el) {
+                el.getAnimations().forEach(anim => {
+                    anim.playbackRate = currentLevel.velocidade;
+                });
+            }
+        });
+    }
 
-// Recupera último nome utilizado caso exista
+    // Carregar configurações salvas
     const savedName = localStorage.getItem('mario_jump_player');
     if (savedName && playerInput) {
         playerInput.value = savedName;
     }
+    const savedChar = localStorage.getItem('mario_jump_char');
+    if (savedChar && PERSONAGENS[savedChar]) {
+        escolherPersonagem(savedChar);
+    } else {
+        escolherPersonagem('sulley');
+    }
 
-/*Inicia uma nova rodada*/
+    pipe.src = OBSTACULO_TUBO.img;
+    pipe.alt = OBSTACULO_TUBO.nome;
+
+    function atualizarPontos() {
+        scoreDisplay.textContent = score;
+    }
+
+    // Controles de Pulo
+    function handleJumpInput(e) {
+        if (e.type === 'keydown' && e.code !== 'Space') return;
+        jump();
+    }
+
+    document.addEventListener('keydown', handleJumpInput);
+    gameBoard.addEventListener('touchstart', jump);
+    gameBoard.addEventListener('mousedown', jump);
+
     function startGame() {
-// Limpa loops anteriores se existirem
         clearInterval(gameLoop);
         clearInterval(scoreLoop);
 
-// Reseta posições e visuais
         resetElements();
 
         isPlaying = true;
         score = 0;
-        scoreDisplay.textContent = '0';
+        coinsCollected = 0;
+        atualizarPontos();
+        coinsDisplay.textContent = '0';
         hudPlayerName.textContent = currentPlayer || 'Jogador';
 
-// NOVO: volta para o nível 1
         currentLevel = LEVELS[0];
         levelDisplay.textContent = '1';
 
-// Ativa animações CSS do jogo
         gameBoard.classList.add('running');
+        applySpeed();
 
-// Loop de pontuação progressiva (1 ponto a cada 100ms)
         scoreLoop = setInterval(() => {
             if (isPlaying) {
                 score += 1;
-                scoreDisplay.textContent = score;
+                atualizarPontos();
 
-// NOVO: confere se já é hora de subir de nível
                 const novoNivel = getLevelByScore(score);
                 if (novoNivel.nivel !== currentLevel.nivel) {
                     currentLevel = novoNivel;
                     levelDisplay.textContent = currentLevel.nivel;
+                    applySpeed();
                 }
             }
         }, 100);
 
-// Loop de colisão
         gameLoop = setInterval(checkCollision, 10);
     }
 
-
     function resetElements() {
-        // Reseta cano
         pipe.style.animation = '';
-        pipe.style.animationDuration = '';      // NOVO: volta à velocidade do CSS
         pipe.style.left = '';
 
-// NOVO: reseta nuvens
-        clouds.style.animationDuration = '';
+        coin.style.animation = '';
+        coin.style.visibility = 'visible';
 
-// Reseta Mario
-        mario.src = 'assets/mario.gif';
+        const jogador = PERSONAGENS[personagemEscolhido] || PERSONAGENS.sulley;
+        mario.src = jogador.img;
         mario.style.animation = '';
         mario.style.bottom = '0px';
-        mario.style.width = '';
+        applySizes();
         mario.style.marginLeft = '';
         mario.classList.remove('jump');
 
@@ -148,9 +245,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const pipePosition = pipe.offsetLeft;
         const marioPosition = +window.getComputedStyle(mario).bottom.replace('px', '');
 
-        // Tolerância de colisão: quando o cano está na faixa de contato com o Mario
-        if (pipePosition <= 120 && pipePosition > 0 && marioPosition < 80) {
+        const jogadorEsquerda = mario.offsetLeft + mario.offsetWidth * 0.20;
+        const jogadorDireita = mario.offsetLeft + mario.offsetWidth * 0.80;
+        const obstEsquerda = pipePosition + pipe.offsetWidth * 0.10;
+        const obstDireita = pipePosition + pipe.offsetWidth * 0.85;
+        const alturaObst = pipe.offsetHeight * 0.6;
+
+        if (obstEsquerda < jogadorDireita && obstDireita > jogadorEsquerda && marioPosition < alturaObst) {
             triggerGameOver(pipePosition, marioPosition);
+            return;
+        }
+
+        // ===== COLETA DA MOEDA =====
+        if (coin.style.visibility !== 'hidden') {
+            const moedaEsquerda = coin.offsetLeft;
+            const moedaDireita = moedaEsquerda + coin.offsetWidth;
+            const moedaBase = parseFloat(window.getComputedStyle(coin).bottom) || 0;
+            const moedaTopo = moedaBase + coin.offsetHeight;
+
+            const jogadorBase = marioPosition + mario.offsetHeight * 0.10;
+            const jogadorTopo = marioPosition + mario.offsetHeight * 0.85;
+
+            const tocouX = moedaEsquerda < jogadorDireita && moedaDireita > jogadorEsquerda;
+            const tocouY = moedaBase < jogadorTopo && moedaTopo > jogadorBase;
+
+            if (tocouX && tocouY) {
+                coin.style.visibility = 'hidden';
+                coinsCollected += 1;
+                score += PONTOS_POR_MOEDA;
+                atualizarPontos();
+                coinsDisplay.textContent = coinsCollected;
+            }
         }
     }
 
@@ -159,43 +284,32 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(gameLoop);
         clearInterval(scoreLoop);
 
-
         gameBoard.classList.remove('running');
-
 
         pipe.style.animation = 'none';
         pipe.style.left = `${pipePosition}px`;
+        coin.style.visibility = 'hidden';
 
-// Congela o Mario na altura exata e muda para a imagem de Game Over
         mario.style.animation = 'none';
         mario.style.bottom = `${marioPosition}px`;
-        mario.src = 'assets/game-over.png';
-        mario.style.width = '75px';
-        mario.style.marginLeft = '50px';
+        mario.src = IMG_LOGO;
+        mario.style.width = '130px';
+        mario.style.marginLeft = '20px';
 
-// Atualiza modal de Game Over
         finalScoreValue.textContent = score;
+        finalCoinsValue.textContent = coinsCollected;
         saveStatusMsg.textContent = 'Salvando pontuação no banco...';
         saveStatusMsg.style.color = '#ffcc00';
 
-// Abre modal de Game Over
         gameoverModal.classList.add('active');
-
-// Salva a pontuação no banco MySQL via PHP
         saveScore(currentPlayer, score);
     }
-
 
     function saveScore(playerName, finalScore) {
         fetch('salvar_ranking.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                nome: playerName,
-                pontos: finalScore
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: playerName, pontos: finalScore })
         })
         .then(res => res.json())
         .then(data => {
@@ -212,12 +326,11 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(err => {
             console.error('Erro na requisição:', err);
-            saveStatusMsg.textContent = '⚠️ Erro ao conectar ao servidor Laragon.';
+            saveStatusMsg.textContent = '⚠️ Erro ao conectar ao servidor.';
             saveStatusMsg.style.color = '#ef4444';
         });
     }
 
-/* Busca o ranking atualizado no banco*/
     function fetchRanking() {
         fetch('obter_ranking.php')
             .then(res => res.json())
@@ -229,13 +342,12 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.error('Erro ao buscar ranking:', err));
     }
 
-/*Atualiza a tabela HTML do ranking*/
     function renderRanking(list, highlightName = null, highlightScore = null) {
         if (!rankingBody) return;
         rankingBody.innerHTML = '';
 
         if (!list || list.length === 0) {
-            rankingBody.innerHTML = '<tr><td colspan="3" class="loading-cell">Nenhuma pontuação gravada ainda. Jogue para ser o 1º!</td></tr>';
+            rankingBody.innerHTML = '<tr><td colspan="3" class="loading-cell">Nenhuma pontuação registrada ainda.</td></tr>';
             return;
         }
 
@@ -244,7 +356,6 @@ document.addEventListener('DOMContentLoaded', () => {
         list.forEach((item, index) => {
             const tr = document.createElement('tr');
 
-            // Destaca a pontuação atual recém-salva se coincidir
             if (!highlighted && highlightName && item.nome === highlightName && parseInt(item.pontos, 10) === highlightScore) {
                 tr.classList.add('highlight-current');
                 highlighted = true;
@@ -265,7 +376,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-/* Função auxiliar para sanitizar strings no HTML*/
     function escapeHtml(str) {
         if (!str) return '';
         return String(str)
@@ -276,60 +386,44 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/'/g, '&#039;');
     }
 
-// Submit do Formulário de Início (INICIAR JOGO)
     startForm.addEventListener('submit', (e) => {
-        e.preventDefault(); // Impede o recarregamento da página
-
+        e.preventDefault();
         const nameValue = playerInput.value.trim();
         if (!nameValue) {
             playerInput.focus();
             return;
         }
-
         currentPlayer = nameValue;
         localStorage.setItem('mario_jump_player', currentPlayer);
-
-        // Fecha tela de início e começa o jogo
         startModal.classList.remove('active');
         startGame();
     });
 
-// Botão "VER RANKING" na tela inicial
     btnViewRanking.addEventListener('click', () => {
         fetchRanking();
         finalScoreValue.textContent = '---';
+        finalCoinsValue.textContent = '---';
         saveStatusMsg.textContent = '';
         startModal.classList.remove('active');
         gameoverModal.classList.add('active');
     });
 
-// Botão "JOGAR NOVAMENTE" no Game Over
     btnRestart.addEventListener('click', () => {
         gameoverModal.classList.remove('active');
         if (!currentPlayer) {
-            startModal.classList.add('active');
-            playerInput.focus();
+            if (personagemEscolhido) {
+                startModal.classList.add('active');
+                playerInput.focus();
+            } else {
+                characterModal.classList.add('active');
+            }
         } else {
             startGame();
         }
     });
 
-// 4. Botão "TROCAR JOGADOR" no Game Over
     btnChangePlayer.addEventListener('click', () => {
         gameoverModal.classList.remove('active');
-        resetElements();
-        startModal.classList.add('active');
-        playerInput.value = '';
-        playerInput.focus();
-    });
-
-    // 5. Controle do Pulo por Teclado (Espaço ou Seta para Cima)
-    document.addEventListener('keydown', (e) => {
-        if (e.code === 'Space' || e.key === ' ' || e.code === 'ArrowUp') {
-            if (isPlaying) {
-                e.preventDefault();
-                jump();
-            }
-        }
+        characterModal.classList.add('active');
     });
 });

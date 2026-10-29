@@ -27,16 +27,16 @@ $nome = mb_substr($nome, 0, 40);
 
 try {
     // Insere o registro no banco com Prepared Statement
-    $stmt = $pdo->prepare("INSERT INTO ranking (nome, pontos) VALUES (:nome, :pontos)");
+    $stmt = $pdo->prepare("INSERT INTO pontuacoes (nome, pontos) VALUES (:nome, :pontos)");
     $stmt->execute([
         ':nome' => $nome,
         ':pontos' => $pontos
     ]);
 
-// Busca os 10 melhores colocados atualizados
+    // Busca os 10 melhores colocados atualizados
     $stmtRanking = $pdo->prepare("
         SELECT id, nome, pontos, DATE_FORMAT(dataRegistro, '%d/%m/%Y %H:%i') as data 
-        FROM ranking 
+        FROM pontuacoes 
         ORDER BY pontos DESC, id ASC 
         LIMIT 10
     ");
